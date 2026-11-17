@@ -29,7 +29,7 @@ const TB = {
   oboe: ["tsukuru", /つなげ/, /1つだけ/], kanri: ["shimau", /ロック/, /「1234」|かけずに/], mfa: ["kiki", /多要素認証/, /だけ|オフ/],
   wifi: ["kiki", /スマホの回線|つながない/, /暗号化なし|鍵マークのない/], ryushutsu: ["kiduku", /すぐ/, /そのまま|変えない/],
   browser: ["shimau", /保存しない/, /保存する|保存しておく/], riseki: ["shimau", /ログアウト|ロック/, /まま/], hoshiki: ["kiki", /認証アプリ|セキュリティキー|生体認証/, /SMS|メール/],
-  reset: ["kiduku", /押さず|ブックマーク/, /知らせのリンク/], rireki: ["kiduku", /変える/, /そのまま|忘れる/], nottori: ["kiduku", /窓口|お問い合わせ/, /放っておく|何もしない/],
+  router: ["kiki", /WPA3|WPA2/, /暗号化なし|一度もしない/], rireki: ["kiduku", /変える/, /そのまま|忘れる/], nottori: ["kiduku", /窓口|お問い合わせ/, /放っておく|何もしない/],
   renkei: ["kiduku", /解除|外し/, /そのまま|さわらない/], support: ["kiki", /替える/, /使い続ける|そのまま/],
 };
 {
@@ -63,7 +63,7 @@ const TB = {
   check("説明は80字以内・ヒントは40字以内・1行は45字以内（やさしい日本語。一文を短く）", !longWhy.length && !longLook.length && !longOpt.length, longWhy.concat(longLook, longOpt.slice(0, 3)).join(","));
   const okSrc = Object.values(G.SRC).every(([n, u]) => /^(総務省|国家サイバー統括室|IPA)「/.test(n) && /^https:\/\/(www\.soumu\.go\.jp|security-portal\.cyber\.go\.jp|www\.ipa\.go\.jp)\//.test(u));
   check("出典は総務省・国家サイバー統括室・IPA の資料だけ", okSrc);
-  check("確かめていないこと（秘密の質問・SMS のコードを人に教えない）と、ほかのゲームの題材（フィッシングの見分け・アプリの権限・SNS の投稿）・実在のサービス名を出さない", !G.KINDS.some((k) => { const all = [k.why, k.look, k.key, k.name]; for (let i = 0; i < 100; i++) { const P = G.make(`${k.id}|nz${i}`); all.push(P.q, ...P.opts); } return /秘密の質問|教えない|フィッシング|詐欺|権限|投稿|SNS|Google|Apple|LINE|Amazon|Yahoo|Microsoft/.test(all.join()); }));
+  check("確かめていないこと（秘密の質問・SMS のコードを人に教えない）と、ほかのゲームの題材（フィッシングの見分け・アプリの権限・SNS の投稿）・実在のサービス名を出さない", !G.KINDS.some((k) => { const all = [k.why, k.look, k.key, k.name]; for (let i = 0; i < 100; i++) { const P = G.make(`${k.id}|nz${i}`); all.push(P.q, ...P.opts); } return /秘密の質問|教えない|フィッシング|詐欺|なりすまし|リンクを押|再設定|権限|投稿|SNS|Google|Apple|LINE|Amazon|Yahoo|Microsoft/.test(all.join()); }));
 }
 {
   // 今日の5問・上級の組み方（3年分）
@@ -482,6 +482,26 @@ try {
     const back = await q.evaluate(() => { const r = __lg.load().runs.e; return r ? r.id : null; });
     await q.evaluate(() => { Storage.prototype.setItem = window.__origSet; __lg.save(() => {}); });
     check("保存に失敗したまま「ここで降りる」を押しても、終えた回が「とことんの続き」に戻らない", back === null && (await q.evaluate(() => __lg.load().runs.e)) === null, `${eid} → ${back}`); }
+  // 終えたタブの保存が失敗したあと、別のタブが終える前の回を保存しても、終えた回を戻さない（login-mamori#1 の CodeRabbit）
+  await q.evaluate(() => __lg.start("e")); await q.waitForTimeout(100);
+  await q.click(`.ch[data-j="${await ansIdx(q)}"]`); await why(q); await q.waitForSelector(".verdict");
+  { const old = await q.evaluate(() => localStorage.getItem(__lg.KEY));
+    await q.evaluate(() => { window.__origSet = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error("full"); }; });
+    await q.click("#quit"); await q.waitForTimeout(150);
+    const back = await q.evaluate((o) => { const s = JSON.parse(o); s.t = Date.now() + 60000; window.__origSet.call(localStorage, __lg.KEY, JSON.stringify(s)); const r = __lg.load().runs.e; return r ? r.id : null; }, old);
+    await q.evaluate(() => { Storage.prototype.setItem = window.__origSet; __lg.save(() => {}); });
+    check("終えたタブの保存が失敗したあと、別のタブが終える前の回を保存しても、終えた回が戻らない", back === null, String(back)); }
+  // 同じ問題の途中で、保存に失敗した側のまちがいと、別のタブのまちがいを両方残す（login-mamori#1 の CodeRabbit）
+  { const r = await q.evaluate(() => {
+      __lg.save((s) => { s.runs.p = { mode: "p", date: __lg.todayKey(), id: "mg1", list: ["nagasa|mg1"], res: [], cur: { i: 0, tag: "nagasa|mg1", wrong: [], hints: 0, step: 1, w2: [] } }; });
+      const base = localStorage.getItem(__lg.KEY);
+      window.__origSet = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error("full"); };
+      __lg.save((s) => { s.runs.p.cur.wrong = ["A"]; s.runs.p.cur.hints = 1; });
+      const o = JSON.parse(base); o.t = Date.now() + 60000; o.runs.p.cur.w2 = ["kiki"]; window.__origSet.call(localStorage, __lg.KEY, JSON.stringify(o));
+      const c = __lg.load().runs.p.cur;
+      Storage.prototype.setItem = window.__origSet; __lg.save((s) => { s.runs.p = null; });
+      return c; });
+    check("同じ問題の途中なら、保存に失敗した側のまちがい・ヒントと、別のタブの2段目のまちがいを両方残す", r.wrong.includes("A") && r.w2.includes("kiki") && r.hints === 1, JSON.stringify(r)); }
   await q.close(); }
 { const q = await newPage(); await closeHow(q);
   await q.evaluate(() => { localStorage.setItem("lgm-v1", JSON.stringify({ v: 1, tut: true, days: {}, hdays: {}, adays: {}, dex: { constructor: 1, toString: 2, nagasa: 1 }, runs: {}, kofi: {}, ach: {}, ebest: 0 })); }); await q.reload(); await q.waitForTimeout(150);
@@ -491,7 +511,7 @@ try {
   check("2段目「何のための守り？」の分け方：どの種類の問題も4つ（作り方・しまい方・鍵を足す/機械を守る・おかしいと思ったら）のどれかで、4つとも使う", bad.length === 0 && Object.keys(G.GROUPS).join() === "tsukuru,shimau,kiki,kiduku" && used.size === 4, bad.join(",")); }
 // 引き継ぎコード（shared-workflows template/qa/transfer-check.mjs）
 try {
-  const sample = { "lgm-v1": JSON.stringify({ v: 1, tut: true, days: { "2026-11-13": { m: [0, 1, 0, 0, 2], k: ["e", "nagasa", "mfa", "wifi", "reset"] } }, hdays: {}, adays: {}, dex: { nagasa: 1, suisoku: 1, haru: 1, koshin: 1, jisho: 1 }, runs: {}, kofi: {}, ach: {}, ebest: 7, t: 1 }), "lgm-fs": "3" };
+  const sample = { "lgm-v1": JSON.stringify({ v: 1, tut: true, days: { "2026-11-13": { m: [0, 1, 0, 0, 2], k: ["e", "nagasa", "mfa", "wifi", "router"] } }, hdays: {}, adays: {}, dex: { nagasa: 1, suisoku: 1, haru: 1, koshin: 1, jisho: 1 }, runs: {}, kofi: {}, ach: {}, ebest: 7, t: 1 }), "lgm-depth": JSON.stringify({ v: 1, rv: { "nagasa|qa1": { s: 1, due: "2026-11-20", t: 5 } }, sure: 4, sureOk: 3, learned: 2 }), "lgm-fs": "3" };
   await checkTransfer({ browser, url, game: "login-mamori", sample, check, open: async (pg) => { if (await pg.locator("#howto[open]").count()) await pg.click("#howto-ok"); } });
 } catch (e) { check("引き継ぎの検査が最後まで動く", false, e.message.split("\n")[0]); }
 await browser.close();
