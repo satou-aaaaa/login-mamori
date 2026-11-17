@@ -334,6 +334,8 @@ try {
     await solve(a);
     await b.click(`.ch[data-j="${await ansIdx(b)}"]`);
     await b.waitForTimeout(200);
+    // b が2段目へ進んでも、2段目まで答えてから数える（確定の前に数えると、二重に入るのを見のがす。login-mamori#1 の CodeRabbit）
+    if (await b.locator(".why button").count()) await why(b);
     const s = await mem(a);
     check("古いタブで同じ問題に答えても二重に数えない", s.runs.d.res.length === 1 && Object.values(s.dex).reduce((x, y) => x + y) === 1);
     // ヒントの数は、別のタブで使った分も減らさない
